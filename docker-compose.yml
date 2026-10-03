@@ -1,0 +1,147 @@
+name: program-capacity
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: capacity
+      POSTGRES_PASSWORD: capacity
+      POSTGRES_DB: capacity
+    ports: ['${POSTGRES_PORT:-3413}:5432']
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U capacity -d capacity']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  kafka:
+    image: apache/kafka:3.8.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:3414,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:3414
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_MESSAGE_MAX_BYTES: 10485760
+    ports: ['3414:3414']
+    healthcheck:
+      test:
+        ['CMD-SHELL', '/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1']
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  kafka-init:
+    image: apache/kafka:3.8.0
+    depends_on:
+      kafka: { condition: service_healthy }
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        set -e
+        T=/opt/kafka/bin/kafka-topics.sh
+        B="--bootstrap-server kafka:9092"
+        $$T $$B --create --if-not-exists --topic treasury.program-events --partitions 3 --replication-factor 1
+        $$T $$B --create --if-not-exists --topic treasury.reconciliation --partitions 3 --replication-factor 1 --config max.message.bytes=10485760
+        $$T $$B --create --if-not-exists --topic treasury.dlq --partitions 1 --replication-factor 1 --config retention.ms=1209600000
+        $$T $$B --create --if-not-exists --topic capacity.events --partitions 3 --replication-factor 1
+        echo "Topics ready"
+
+  dev-idp:
+    build: { context: ., target: devtools }
+    command: ['node', '--import', 'tsx', 'scripts/dev-idp.ts']
+    environment:
+      PORT: 3412
+      AUTH_ISSUER: http://dev-idp.local
+      AUTH_AUDIENCE: program-capacity-api
+    ports: ['3412:3412']
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3412/health || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: { context: ., target: runtime }
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+      dev-idp: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      PORT: 3410
+      METRICS_PORT: 3411
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://capacity:capacity@postgres:5432/capacity
+      KAFKA_BROKERS: kafka:9092
+      AUTH_ISSUER: http://dev-idp.local
+      AUTH_AUDIENCE: program-capacity-api
+      AUTH_JWKS_URL: http://dev-idp:3412/.well-known/jwks.json
+      # Generous for local load testing from the playground; production default is 600/min per client.
+      RATE_LIMIT_PER_MINUTE: 10000
+      FX_STATIC_RATES: EUR:USD=1.08,GBP:USD=1.27,USD:JPY=149.50,CHF:USD=1.13,KWD:USD=3.25
+    ports: ['${APP_PORT:-3410}:3410', '${METRICS_PORT:-3411}:3411']
+
+  # Publishes the seed programs through Kafka, exactly like treasury would. Idempotent.
+  # Plays the treasury system: on `up` it publishes the seed programs through Kafka (idempotent).
+  # Ad-hoc messages: docker compose run --rm seed <program|release|snapshot|duplicate|stale|poison> ...
+  seed:
+    build: { context: ., target: devtools }
+    depends_on:
+      app: { condition: service_healthy }
+    environment:
+      KAFKA_BROKERS: kafka:9092
+    entrypoint: ['node', '--import', 'tsx', 'scripts/produce.ts']
+    command: ['seed']
+
+  # Dev-only HTTP front for the treasury simulator, used by the playground UI.
+  treasury-sim:
+    build: { context: ., target: devtools }
+    depends_on:
+      kafka-init: { condition: service_completed_successfully }
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      PORT: 3417
+    entrypoint: ['node', '--import', 'tsx', 'scripts/produce.ts']
+    command: ['serve']
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3417/health || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Dev-only web UI for trying the API: http://localhost:3416
+  playground:
+    image: nginx:1.27-alpine
+    depends_on:
+      app: { condition: service_healthy }
+      treasury-sim: { condition: service_healthy }
+    # Directories, not single files: editors save by replacing the file (new inode), which a
+    # single-file bind mount would never see.
+    volumes:
+      - ./playground:/srv/playground:ro
+      - ./scripts:/srv/scripts:ro
+    command: ['nginx', '-c', '/srv/playground/nginx.conf', '-g', 'daemon off;']
+    ports: ['3416:80']
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    profiles: ['ui']
+    depends_on:
+      kafka: { condition: service_healthy }
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports: ['3415:8080']
+
+volumes:
+  pgdata:

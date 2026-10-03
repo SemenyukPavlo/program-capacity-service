@@ -1,0 +1,17 @@
+{
+  "ops-console": {
+    "secret": "ops-console-dev-secret",
+    "scopes": ["capacity:read", "reservations:write", "reservations:release"],
+    "programs": "*"
+  },
+  "supplier-portal": {
+    "secret": "supplier-portal-dev-secret",
+    "scopes": ["capacity:read", "reservations:write", "reservations:release"],
+    "programs": ["PRG-USD-001", "PRG-EUR-001"]
+  },
+  "dashboard": {
+    "secret": "dashboard-dev-secret",
+    "scopes": ["capacity:read"],
+    "programs": "*"
+  }
+}

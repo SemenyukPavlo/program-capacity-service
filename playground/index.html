@@ -1,0 +1,1253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Capacity Playground</title>
+    <style>
+      :root {
+        --bg: #f5f6f8;
+        --panel: #fff;
+        --text: #1b1f24;
+        --muted: #69717d;
+        --border: #e3e6eb;
+        --accent: #2f5bea;
+        --accent-soft: #e8eefe;
+        --ok: #1a7f37;
+        --ok-soft: #dafbe1;
+        --warn: #9a6700;
+        --warn-soft: #fff4cc;
+        --err: #cf222e;
+        --err-soft: #ffebe9;
+        --code: #f2f3f5;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0e1116;
+          --panel: #161b22;
+          --text: #e6edf3;
+          --muted: #8b949e;
+          --border: #2d333b;
+          --accent: #5b8cff;
+          --accent-soft: #1a2640;
+          --ok: #3fb950;
+          --ok-soft: #12261a;
+          --warn: #d29922;
+          --warn-soft: #2b2111;
+          --err: #f85149;
+          --err-soft: #2d1416;
+          --code: #0d1117;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.5 system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+      }
+      .bar {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 10px 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        align-items: center;
+      }
+      .brand {
+        font-weight: 650;
+        margin-right: auto;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+      }
+      h3 {
+        margin: 0 0 4px;
+        font-size: 15px;
+      }
+      p.help {
+        margin: 0 0 12px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      label.f {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      input,
+      select,
+      textarea,
+      button {
+        font: inherit;
+        color: inherit;
+      }
+      input,
+      select,
+      textarea {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 7px 9px;
+        min-width: 0;
+      }
+      textarea {
+        width: 100%;
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+      button {
+        border: 1px solid var(--border);
+        background: var(--panel);
+        border-radius: 8px;
+        padding: 7px 14px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      button:hover {
+        border-color: var(--accent);
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      button.link {
+        border: none;
+        background: none;
+        color: var(--accent);
+        padding: 4px 6px;
+      }
+      button.sm {
+        padding: 3px 10px;
+        font-size: 12.5px;
+      }
+      button.danger {
+        color: var(--err);
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: flex-end;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, monospace;
+        font-size: 12px;
+      }
+
+      /* capacity */
+      .cap {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .cap .k {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .cap .v {
+        font-size: 24px;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+      }
+      .meter {
+        height: 10px;
+        border-radius: 99px;
+        background: var(--code);
+        overflow: hidden;
+        margin: 14px 0 8px;
+      }
+      .meter > div {
+        height: 100%;
+        background: var(--accent);
+        transition: width 0.3s;
+      }
+      .live {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--muted);
+      }
+      .dot.on {
+        background: var(--ok);
+        box-shadow: 0 0 0 3px var(--ok-soft);
+      }
+      .flash {
+        animation: flash 0.9s;
+      }
+      @keyframes flash {
+        from {
+          background: var(--accent-soft);
+        }
+      }
+
+      /* badges */
+      .badge {
+        display: inline-block;
+        padding: 1px 9px;
+        border-radius: 99px;
+        font-size: 11.5px;
+        font-weight: 600;
+        background: var(--code);
+        color: var(--muted);
+      }
+      .b-ok {
+        background: var(--ok-soft);
+        color: var(--ok);
+      }
+      .b-warn {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+      .b-err {
+        background: var(--err-soft);
+        color: var(--err);
+      }
+      .b-info {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      /* tabs */
+      .tabs {
+        display: flex;
+        gap: 4px;
+        border-bottom: 1px solid var(--border);
+        margin: -4px 0 16px;
+      }
+      .tabs button {
+        border: none;
+        border-bottom: 2px solid transparent;
+        border-radius: 0;
+        background: none;
+        padding: 8px 14px;
+        color: var(--muted);
+      }
+      .tabs button.active {
+        color: var(--text);
+        border-bottom-color: var(--accent);
+        font-weight: 600;
+      }
+      .tab {
+        display: none;
+      }
+      .tab.active {
+        display: block;
+      }
+
+      /* results */
+      .result {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        font-size: 13px;
+      }
+      .result:empty {
+        display: none;
+      }
+      .r-ok {
+        background: var(--ok-soft);
+        color: var(--ok);
+      }
+      .r-err {
+        background: var(--err-soft);
+        color: var(--err);
+      }
+      .r-info {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      /* tables */
+      .table-wrap {
+        overflow-x: auto;
+        margin-top: 14px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 6px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+      }
+      th {
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 12px;
+      }
+      .num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .act {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        justify-content: flex-end;
+      }
+      .act input {
+        width: 120px;
+        padding: 4px 8px;
+      }
+      details.adv {
+        margin-top: 14px;
+        border-top: 1px dashed var(--border);
+        padding-top: 10px;
+      }
+      details.adv summary {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      /* treasury grid */
+      .grid2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .grid2 .card {
+        background: var(--bg);
+      }
+
+      /* request drawer */
+      .drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(480px, 100vw);
+        background: var(--panel);
+        border-left: 1px solid var(--border);
+        box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+        transform: translateX(100%);
+        transition: transform 0.2s;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+      }
+      .drawer.open {
+        transform: none;
+      }
+      .drawer .head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+      }
+      .drawer .list.hide-get details[data-get] {
+        display: none;
+      }
+      .drawer .list {
+        overflow-y: auto;
+        padding: 10px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      details.entry {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6px 8px;
+      }
+      details.entry summary {
+        cursor: pointer;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 12px;
+        list-style: none;
+      }
+      details.entry .path {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      pre {
+        background: var(--code);
+        border-radius: 6px;
+        padding: 8px;
+        margin: 6px 0 0;
+        overflow: auto;
+        max-height: 280px;
+        font-size: 11.5px;
+      }
+      @media (max-width: 760px) {
+        .cap,
+        .grid2 {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="bar">
+        <span class="brand">Capacity Playground</span>
+        <label class="f"
+          >Act as
+          <select id="client"></select>
+        </label>
+        <label class="f"
+          >Program
+          <select id="program" disabled></select>
+        </label>
+        <button id="openLog">Requests <span class="badge" id="logCount">0</span></button>
+        <a href="http://localhost:3410/docs" target="_blank" class="muted">API docs ↗</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="card" id="capCard">
+        <div class="row" style="justify-content: space-between; align-items: center; margin-bottom: 8px">
+          <h3>Capacity <span id="capStatus"></span></h3>
+          <span class="live"><span class="dot" id="liveDot"></span><span id="liveText">connecting…</span></span>
+        </div>
+        <div class="cap">
+          <div>
+            <div class="k">Credit limit</div>
+            <div class="v" id="capLimit">—</div>
+          </div>
+          <div>
+            <div class="k">Reserved</div>
+            <div class="v" id="capReserved">—</div>
+          </div>
+          <div>
+            <div class="k">Available</div>
+            <div class="v" id="capAvailable">—</div>
+          </div>
+        </div>
+        <div class="meter"><div id="capBar" style="width: 0"></div></div>
+        <div class="muted" style="font-size: 12px" id="capMeta"></div>
+      </section>
+
+      <section class="card">
+        <div class="tabs">
+          <button data-tab="res" class="active">Reservations</button>
+          <button data-tab="treasury">Treasury (Kafka)</button>
+          <button data-tab="ledger">Ledger</button>
+        </div>
+
+        <!-- Reservations -->
+        <div class="tab active" id="tab-res">
+          <h3>Reserve capacity for an invoice</h3>
+          <p class="help">
+            An invoice approved for early payment takes part of the limit. Foreign currencies are converted at today's
+            rate, which is then locked for that invoice.
+          </p>
+          <div class="row">
+            <label class="f"
+              >Invoice
+              <span class="row" style="gap: 4px"
+                ><input id="resInvoice" size="14" /><button class="sm" id="newInvoice" title="New invoice id">
+                  ↻
+                </button></span
+              >
+            </label>
+            <label class="f">Amount <input id="resAmount" value="100000.00" size="12" /></label>
+            <label class="f"
+              >Currency
+              <select id="resCurrency"></select>
+            </label>
+            <button class="primary" id="reserve">Reserve</button>
+          </div>
+          <div id="reserveResult" class="result"></div>
+
+          <details class="adv">
+            <summary>Advanced: safe retries and load test</summary>
+            <div class="row" style="margin-top: 10px">
+              <label class="f"
+                >Idempotency-Key (send the same key twice → the second call is replayed, not re-applied)
+                <span class="row" style="gap: 6px"
+                  ><input id="resKey" placeholder="empty = no key" size="28" /><button class="sm" id="genKey">
+                    Generate
+                  </button></span
+                >
+              </label>
+            </div>
+            <div class="row" style="margin-top: 10px">
+              <label class="f">Parallel requests <input id="burstN" value="20" size="5" /></label>
+              <button id="burst">Fire N different invoices at once</button>
+              <button id="burstSame">Fire N copies of one invoice</button>
+            </div>
+            <p class="help" style="margin-top: 8px">
+              Capacity must never be exceeded, and one invoice must never be reserved twice, however many requests run
+              in parallel.
+            </p>
+          </details>
+
+          <div class="row" style="justify-content: space-between; margin-top: 18px; align-items: center">
+            <h3>Reservations <span class="muted" style="font-weight: 400">· newest first</span></h3>
+            <select id="resFilter">
+              <option value="">All</option>
+              <option value="RESERVED">Reserved</option>
+              <option value="PARTIALLY_RELEASED">Partially repaid</option>
+              <option value="RELEASED">Repaid</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Invoice</th>
+                  <th>Status</th>
+                  <th class="num">Outstanding (invoice)</th>
+                  <th class="num">Outstanding (program)</th>
+                  <th class="num">Repay — empty = everything</th>
+                </tr>
+              </thead>
+              <tbody id="resBody"></tbody>
+            </table>
+          </div>
+          <div style="margin-top: 8px"><button class="link" id="moreRes" hidden>Load more</button></div>
+        </div>
+
+        <!-- Treasury -->
+        <div class="tab" id="tab-treasury">
+          <p class="help">
+            These buttons play the bank's treasury system: they publish messages to Kafka, and the service picks them up
+            within a second. The capacity card above updates by itself.
+          </p>
+          <div class="grid2">
+            <div class="card">
+              <h3>Change limit or status</h3>
+              <p class="help">Lowering the limit below what is reserved is allowed: available goes negative.</p>
+              <div class="row">
+                <label class="f">Limit <input id="tLimit" size="14" /></label>
+                <label class="f"
+                  >Status
+                  <select id="tStatus">
+                    <option>ACTIVE</option>
+                    <option>SUSPENDED</option>
+                    <option>CLOSED</option>
+                  </select>
+                </label>
+                <button class="primary" id="tProgram">Send</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Report a repayment</h3>
+              <p class="help">The buyer repaid an invoice and treasury saw it first. Empty amount = repaid in full.</p>
+              <div class="row">
+                <label class="f">Invoice <input id="tRelInvoice" list="openInvoices" size="14" /></label>
+                <label class="f">Amount <input id="tRelAmount" size="10" placeholder="all" /></label>
+                <button class="primary" id="tRelease">Send</button>
+              </div>
+              <datalist id="openInvoices"></datalist>
+            </div>
+
+            <div class="card">
+              <h3>Full reconciliation snapshot</h3>
+              <p class="help">
+                Treasury's complete list of open invoices (<code>invoice=outstanding</code>, program currency), plus the
+                limit and status set on the left. Edit a line to create a difference: it is corrected and logged in the
+                ledger.
+              </p>
+              <textarea id="tSnapItems" rows="5"></textarea>
+              <div class="row" style="margin-top: 8px">
+                <button class="sm" id="tFill">Reload current state</button>
+                <button class="primary" id="tSnapshot">Send snapshot</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Delivery guarantees</h3>
+              <p class="help">Kafka can redeliver or reorder messages. Each button shows how the service copes.</p>
+              <div class="row" style="flex-direction: column; align-items: stretch; gap: 8px">
+                <button id="tDuplicate">Send the same event twice → applied once</button>
+                <button id="tStale">Send an out-of-date event → ignored</button>
+                <button id="tPoison" class="danger">Send a broken message → dead-letter queue</button>
+              </div>
+            </div>
+          </div>
+          <div id="treasuryResult" class="result"></div>
+        </div>
+
+        <!-- Ledger -->
+        <div class="tab" id="tab-ledger">
+          <p class="help">
+            Every change to capacity, newest first. Append-only: the database refuses updates and deletes.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>What</th>
+                  <th>Invoice / reason</th>
+                  <th class="num">Change</th>
+                  <th class="num">Reserved after</th>
+                  <th>By</th>
+                </tr>
+              </thead>
+              <tbody id="ledgerBody"></tbody>
+            </table>
+          </div>
+          <div style="margin-top: 8px"><button class="link" id="moreLedger" hidden>Load more</button></div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="drawer" id="drawer">
+      <div class="head">
+        <strong style="flex: 1">Requests</strong>
+        <label class="muted" style="font-size: 12px"><input type="checkbox" id="showGets" /> Show GET</label>
+        <button class="sm" id="clearLog">Clear</button>
+        <button class="sm" id="closeLog">Close</button>
+      </div>
+      <div class="list hide-get" id="log">
+        <span class="muted">Every API call made by this page appears here.</span>
+      </div>
+    </aside>
+
+    <script>
+      const CURRENCIES = ['USD', 'EUR', 'GBP', 'CHF', 'JPY', 'KWD'];
+      const $ = (id) => document.getElementById(id);
+      const esc = (v) =>
+        String(v ?? '').replace(
+          /[&<>"']/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+        );
+      const fmt = (v) =>
+        v === undefined || v === null ? '—' : Number(v).toLocaleString(undefined, { maximumFractionDigits: 3 });
+      const rnd = () => Math.random().toString(36).slice(2, 7).toUpperCase();
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      const state = {
+        clients: {},
+        client: null,
+        token: null,
+        program: null,
+        capacity: null,
+        resCursor: null,
+        ledgerCursor: null,
+        stream: null,
+        logCount: 0,
+      };
+
+      // -------------------------------------------------------------- HTTP + request log
+      async function call(label, url, options = {}) {
+        const started = performance.now();
+        let status = 0;
+        let body;
+        let headers = new Headers();
+        try {
+          const res = await fetch(url, options);
+          status = res.status;
+          headers = res.headers;
+          const text = await res.text();
+          try {
+            body = text ? JSON.parse(text) : null;
+          } catch {
+            body = text;
+          }
+        } catch (err) {
+          body = { error: String(err) };
+        }
+        logEntry({ label, options, status, body, headers, ms: Math.round(performance.now() - started) });
+        return { status, body, headers };
+      }
+
+      async function api(method, path, body, extraHeaders = {}, retried = false) {
+        const headers = { ...extraHeaders };
+        if (state.token) headers.Authorization = `Bearer ${state.token}`;
+        if (body !== undefined) headers['Content-Type'] = 'application/json';
+        const res = await call(`${method} ${path}`, `/api${path}`, {
+          method,
+          headers,
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        // Tokens live 1h: on 401 fetch a fresh one for the same client and retry once.
+        if (res.status === 401 && state.token && !retried && (await fetchToken())) {
+          return api(method, path, body, extraHeaders, true);
+        }
+        return res;
+      }
+
+      const treasury = (command, args) =>
+        call(`KAFKA ${command}`, '/treasury/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command, args }),
+        });
+
+      const statusClass = (s) => (s >= 200 && s < 300 ? 'b-ok' : s >= 400 && s < 500 ? 'b-warn' : 'b-err');
+
+      function logEntry({ label, options, status, body, headers, ms }) {
+        const log = $('log');
+        if (log.firstElementChild?.tagName === 'SPAN') log.innerHTML = '';
+        const reqHeaders = { ...(options.headers || {}) };
+        if (reqHeaders.Authorization) reqHeaders.Authorization = 'Bearer …';
+        const interesting = ['x-request-id', 'idempotent-replayed', 'location', 'etag']
+          .filter((h) => headers.get(h))
+          .map((h) => `${h}: ${headers.get(h)}`)
+          .join('\n');
+        const section = (title, content) =>
+          content ? `<div class="muted" style="margin-top:6px">${title}</div><pre>${esc(content)}</pre>` : '';
+        const el = document.createElement('details');
+        el.className = 'entry';
+        if (label.startsWith('GET ')) el.dataset.get = '';
+        el.innerHTML = `
+          <summary>
+            <span class="badge ${statusClass(status)}">${status || 'ERR'}</span>
+            <span class="path mono">${esc(label)}</span>
+            ${body?.code ? `<span class="badge">${esc(body.code)}</span>` : ''}
+            <span class="muted">${ms} ms</span>
+          </summary>
+          ${section('Request body', options.body ? pretty(String(options.body)) : '')}
+          ${section('Request headers', Object.keys(reqHeaders).length ? JSON.stringify(reqHeaders, null, 2) : '')}
+          ${section('Response headers', interesting)}
+          ${section('Response', JSON.stringify(body, null, 2))}`;
+        log.prepend(el);
+        while (log.children.length > 300) log.lastElementChild.remove();
+        $('logCount').textContent = String(++state.logCount);
+      }
+
+      function pretty(text) {
+        try {
+          return JSON.stringify(JSON.parse(text), null, 2);
+        } catch {
+          return text;
+        }
+      }
+
+      // -------------------------------------------------------------- human-readable outcomes
+      function explain(res) {
+        const b = res.body || {};
+        const ccy = b.currency ?? state.capacity?.currency ?? '';
+        switch (b.code) {
+          case 'INSUFFICIENT_CAPACITY':
+            return `Not enough capacity: requested ${fmt(b.requested)} ${ccy}, available ${fmt(b.available)} ${ccy}.`;
+          case 'PROGRAM_NOT_ACTIVE':
+            return `The program is ${b.programStatus}: new reservations are blocked (repayments still work).`;
+          case 'INVOICE_ALREADY_RESERVED':
+            return `This invoice already has a reservation (${b.existingAmount?.amount} ${b.existingAmount?.currency}, ${b.existingStatus}). Use a new invoice id.`;
+          case 'IDEMPOTENCY_KEY_REUSED':
+            return 'That Idempotency-Key was already used for a different request.';
+          case 'RELEASE_EXCEEDS_OUTSTANDING':
+            return `Can't repay more than is outstanding (${b.outstanding} ${b.currency}).`;
+          case 'INVALID_STATE_TRANSITION':
+            return `Not allowed in status ${b.reservationStatus}: only untouched reservations can be cancelled.`;
+          case 'UNSUPPORTED_CURRENCY_PAIR':
+            return `No exchange rate for ${b.from} → ${b.to}.`;
+          case 'FORBIDDEN':
+            return `“${state.client}” is not allowed to do this (${b.detail}).`;
+          case 'PROGRAM_NOT_FOUND':
+            return `“${state.client}” has no access to this program.`;
+          case 'RATE_LIMITED':
+            return 'Too many requests for this client; slow down.';
+          default:
+            return b.detail || b.error || `HTTP ${res.status}`;
+        }
+      }
+
+      function show(el, kind, html) {
+        el.className = `result r-${kind}`;
+        el.innerHTML = html;
+      }
+
+      // -------------------------------------------------------------- auth & programs
+      async function loadClients() {
+        state.clients = await (await fetch('/clients.json')).json();
+        const describe = (c) =>
+          c.scopes.length === 1
+            ? 'read-only'
+            : c.programs === '*'
+              ? 'full access'
+              : `only ${c.programs.length} programs`;
+        $('client').innerHTML = Object.entries(state.clients)
+          .map(([id, c]) => `<option value="${esc(id)}">${esc(id)} (${describe(c)})</option>`)
+          .join('');
+      }
+
+      async function fetchToken() {
+        const id = $('client').value;
+        const res = await call(`TOKEN ${id}`, '/idp/oauth/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'client_credentials',
+            client_id: id,
+            client_secret: state.clients[id].secret,
+          }),
+        });
+        if (res.status !== 200) return false;
+        state.client = id;
+        state.token = res.body.access_token;
+        restartStream();
+        return true;
+      }
+
+      async function switchClient() {
+        if (await fetchToken()) await loadPrograms();
+      }
+
+      async function loadPrograms() {
+        const res = await api('GET', '/v1/programs');
+        const select = $('program');
+        const previous = state.program?.programId;
+        const items = res.status === 200 ? res.body.items : [];
+        select.innerHTML = items
+          .map((p) => `<option value="${esc(p.programId)}">${esc(p.programId)} · ${esc(p.currency)}</option>`)
+          .join('');
+        select.disabled = !items.length;
+        if (previous && items.some((p) => p.programId === previous)) select.value = previous;
+        await selectProgram();
+      }
+
+      async function selectProgram() {
+        const id = $('program').value;
+        if (!id) return;
+        state.program = { programId: id };
+        state.capacity = null;
+        await refreshCapacity();
+        if (state.capacity) {
+          $('resCurrency').value = state.capacity.currency;
+          $('tLimit').value = state.capacity.limit;
+          $('tStatus').value = state.capacity.status;
+        }
+        await Promise.all([loadReservations(true), loadLedger(true), fillSnapshot()]);
+        restartStream();
+      }
+
+      // -------------------------------------------------------------- capacity (live)
+      async function refreshCapacity() {
+        if (!state.program) return;
+        const res = await api('GET', `/v1/programs/${state.program.programId}/capacity`);
+        if (res.status === 200) renderCapacity(res.body);
+      }
+
+      function renderCapacity(c) {
+        const changed = state.capacity && state.capacity.version !== c.version;
+        state.capacity = c;
+        const ccy = c.currency;
+        $('capLimit').textContent = `${fmt(c.limit)} ${ccy}`;
+        $('capReserved').textContent = `${fmt(c.reserved)} ${ccy}`;
+        $('capAvailable').textContent = `${fmt(c.available)} ${ccy}`;
+        $('capAvailable').style.color = Number(c.available) < 0 ? 'var(--err)' : '';
+        const pct = Number(c.limit) > 0 ? Math.min(100, (Number(c.reserved) / Number(c.limit)) * 100) : 0;
+        $('capBar').style.width = `${pct}%`;
+        $('capBar').style.background = pct >= 100 ? 'var(--err)' : '';
+        const cls = { ACTIVE: 'b-ok', SUSPENDED: 'b-warn', CLOSED: 'b-err' }[c.status];
+        $('capStatus').innerHTML = `<span class="badge ${cls}">${esc(c.status)}</span>`;
+        $('capMeta').textContent =
+          `${pct.toFixed(1)}% used · version ${c.version} · last reconciled with treasury: ` +
+          (c.lastReconciledAt ? new Date(c.lastReconciledAt).toLocaleString() : 'never');
+        if (changed) {
+          $('capCard').classList.remove('flash');
+          void $('capCard').offsetWidth;
+          $('capCard').classList.add('flash');
+        }
+      }
+
+      function setLive(on, text) {
+        $('liveDot').className = on ? 'dot on' : 'dot';
+        $('liveText').textContent = text;
+      }
+
+      // Server-Sent Events over fetch (EventSource can't send an Authorization header).
+      function restartStream() {
+        state.stream?.abort();
+        if (!state.token || !state.program) return;
+        const controller = new AbortController();
+        state.stream = controller;
+        const programId = state.program.programId;
+        setLive(false, 'connecting…');
+        fetch(`/api/v1/programs/${programId}/capacity/stream`, {
+          headers: { Authorization: `Bearer ${state.token}`, Accept: 'text/event-stream' },
+          signal: controller.signal,
+        })
+          .then(async (res) => {
+            if (res.status !== 200) return setLive(false, `live updates unavailable (${res.status})`);
+            setLive(true, 'live');
+            const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+            let buffer = '';
+            for (;;) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buffer += value;
+              let idx;
+              while ((idx = buffer.indexOf('\n\n')) >= 0) {
+                const chunk = buffer.slice(0, idx);
+                buffer = buffer.slice(idx + 2);
+                const type = /^event: (.*)$/m.exec(chunk)?.[1];
+                const data = /^data: (.*)$/m.exec(chunk)?.[1];
+                if (type === 'capacity' && data && state.program?.programId === programId) {
+                  renderCapacity(JSON.parse(data));
+                  refreshListsSoon();
+                }
+              }
+            }
+            if (state.stream === controller) setLive(false, 'disconnected');
+          })
+          .catch(() => state.stream === controller && setLive(false, 'disconnected'));
+      }
+
+      // A burst produces many change events; refresh the lists once they settle.
+      let listsTimer;
+      function refreshListsSoon() {
+        clearTimeout(listsTimer);
+        listsTimer = setTimeout(() => Promise.all([loadReservations(true), loadLedger(true)]), 400);
+      }
+
+      async function refreshNow() {
+        if (!$('liveDot').classList.contains('on'))
+          await Promise.all([refreshCapacity(), loadReservations(true), loadLedger(true)]);
+      }
+
+      // -------------------------------------------------------------- reservations
+      const STATUS = {
+        RESERVED: ['Reserved', 'b-info'],
+        PARTIALLY_RELEASED: ['Partially repaid', 'b-warn'],
+        RELEASED: ['Repaid', 'b-ok'],
+        CANCELLED: ['Cancelled', ''],
+      };
+      const statusBadge = (s) => `<span class="badge ${STATUS[s]?.[1] ?? ''}">${esc(STATUS[s]?.[0] ?? s)}</span>`;
+
+      function actionsFor(r) {
+        const open = r.status === 'RESERVED' || r.status === 'PARTIALLY_RELEASED';
+        if (!open) return '<div class="act muted">—</div>';
+        const inv = esc(r.invoiceId);
+        return `<div class="act">
+          <input data-amount="${inv}" placeholder="${esc(r.invoice.currency)} amount" />
+          <button class="sm primary" data-act="repay" data-inv="${inv}" data-ccy="${esc(r.invoice.currency)}">Repay</button>
+          ${r.status === 'RESERVED' ? `<button class="sm danger" data-act="cancel" data-inv="${inv}" title="Invoice withdrawn before any repayment">Cancel</button>` : ''}
+        </div>`;
+      }
+
+      async function loadReservations(reset) {
+        if (!state.program) return;
+        if (reset) state.resCursor = null;
+        const params = new URLSearchParams({ limit: '20', order: 'desc' });
+        if ($('resFilter').value) params.set('status', $('resFilter').value);
+        if (state.resCursor) params.set('cursor', state.resCursor);
+        const res = await api('GET', `/v1/programs/${state.program.programId}/reservations?${params}`);
+        if (res.status !== 200) return;
+        const rows = res.body.items
+          .map((r) => {
+            const fx =
+              r.invoice.currency !== r.program.currency
+                ? `of ${fmt(r.invoice.amount)} · rate ${esc(r.fx.rate)}`
+                : `of ${fmt(r.invoice.amount)}`;
+            const source =
+              r.source !== 'API'
+                ? ` <span class="badge" title="created by ${esc(r.source)}">${esc(r.source.toLowerCase())}</span>`
+                : '';
+            return `<tr>
+              <td class="mono">${esc(r.invoiceId)}${source}</td>
+              <td>${statusBadge(r.status)}</td>
+              <td class="num">${fmt(r.invoice.outstanding)} ${esc(r.invoice.currency)}<div class="muted" style="font-size:11.5px">${fx}</div></td>
+              <td class="num">${fmt(r.program.outstanding)} ${esc(r.program.currency)}</td>
+              <td>${actionsFor(r)}</td>
+            </tr>`;
+          })
+          .join('');
+        // Live refreshes re-render the table; keep amounts the user is typing.
+        const typed = {};
+        document.querySelectorAll('input[data-amount]').forEach((i) => i.value && (typed[i.dataset.amount] = i.value));
+        const empty = '<tr><td colspan="5" class="muted">No reservations yet. Reserve one above.</td></tr>';
+        if (reset) $('resBody').innerHTML = rows || empty;
+        else $('resBody').insertAdjacentHTML('beforeend', rows);
+        document.querySelectorAll('input[data-amount]').forEach((i) => {
+          if (typed[i.dataset.amount]) i.value = typed[i.dataset.amount];
+        });
+        state.resCursor = res.body.nextCursor;
+        $('moreRes').hidden = !state.resCursor;
+      }
+
+      $('resBody').addEventListener('click', async (e) => {
+        const btn = e.target.closest('button[data-act]');
+        if (!btn) return;
+        const inv = btn.dataset.inv;
+        const base = `/v1/programs/${state.program.programId}/reservations/${encodeURIComponent(inv)}`;
+        let res;
+        let what;
+        if (btn.dataset.act === 'cancel') {
+          res = await api('POST', `${base}/cancel`);
+          what = `Cancelled ${inv}`;
+        } else {
+          const amount = document.querySelector(`input[data-amount="${CSS.escape(inv)}"]`).value.trim();
+          res = await api('POST', `${base}/release`, amount ? { amount, currency: btn.dataset.ccy } : {});
+          what = amount ? `Repaid ${amount} ${btn.dataset.ccy} of ${inv}` : `${inv} repaid in full`;
+        }
+        if (res.status === 200) {
+          // Clear the amount so a second click can't repay the same sum again by accident.
+          const input = document.querySelector(`input[data-amount="${CSS.escape(inv)}"]`);
+          if (input) input.value = '';
+          const r = res.body.reservation;
+          const c = res.body.capacity;
+          show(
+            $('reserveResult'),
+            'ok',
+            `${esc(what)}. Outstanding now ${fmt(r.program.outstanding)} ${esc(r.program.currency)}; available ${fmt(c.available)} ${esc(c.currency)}.`,
+          );
+        } else show($('reserveResult'), 'err', esc(explain(res)));
+        await refreshNow();
+      });
+
+      // -------------------------------------------------------------- reserve
+      const reserveBody = (invoiceId) => ({
+        invoiceId,
+        amount: $('resAmount').value.trim(),
+        currency: $('resCurrency').value,
+      });
+
+      $('reserve').onclick = async () => {
+        const key = $('resKey').value.trim();
+        const res = await api(
+          'POST',
+          `/v1/programs/${state.program.programId}/reservations`,
+          reserveBody($('resInvoice').value.trim()),
+          key ? { 'Idempotency-Key': key } : {},
+        );
+        if (res.status === 200 || res.status === 201) {
+          const r = res.body.reservation;
+          const c = res.body.capacity;
+          const fx =
+            r.invoice.currency !== r.program.currency
+              ? ` (${fmt(r.invoice.amount)} ${esc(r.invoice.currency)} at ${esc(r.fx.rate)})`
+              : '';
+          const prefix = res.headers.get('idempotent-replayed')
+            ? 'Same Idempotency-Key: the original response was replayed, nothing was reserved twice. '
+            : res.status === 200
+              ? 'This invoice was already reserved with the same amount: nothing changed. '
+              : '';
+          show(
+            $('reserveResult'),
+            'ok',
+            `${prefix}Reserved ${fmt(r.program.amount)} ${esc(r.program.currency)}${fx} for ${esc(r.invoiceId)}. Available: ${fmt(c.available)} ${esc(c.currency)}.`,
+          );
+          if (!key) $('resInvoice').value = `INV-${rnd()}`;
+        } else show($('reserveResult'), 'err', esc(explain(res)));
+        await refreshNow();
+      };
+
+      async function burst(sameInvoice) {
+        const n = Math.max(1, Math.min(200, Number($('burstN').value) || 1));
+        const prefix = `LOAD-${rnd()}`;
+        show($('reserveResult'), 'info', `Sending ${n} requests in parallel…`);
+        const results = await Promise.all(
+          Array.from({ length: n }, (_, i) =>
+            api(
+              'POST',
+              `/v1/programs/${state.program.programId}/reservations`,
+              reserveBody(sameInvoice ? prefix : `${prefix}-${i + 1}`),
+            ),
+          ),
+        );
+        const created = results.filter((r) => r.status === 201).length;
+        const same = results.filter((r) => r.status === 200).length;
+        const full = results.filter((r) => r.body?.code === 'INSUFFICIENT_CAPACITY').length;
+        const other = n - created - same - full;
+        const parts = [`<b>${created}</b> reserved`];
+        if (same) parts.push(`<b>${same}</b> recognised as the same invoice (no double booking)`);
+        if (full) parts.push(`<b>${full}</b> refused: not enough capacity`);
+        if (other) parts.push(`<b>${other}</b> other errors (see Requests)`);
+        show($('reserveResult'), other ? 'err' : 'ok', `${n} parallel requests → ${parts.join(', ')}.`);
+        await refreshNow();
+      }
+
+      // -------------------------------------------------------------- treasury
+      const pid = () => state.program.programId;
+      const pccy = () => state.capacity?.currency ?? 'USD';
+
+      async function sendTreasury(command, args, expectation) {
+        const res = await treasury(command, args);
+        if (res.status === 200) show($('treasuryResult'), 'ok', `Sent to Kafka. ${expectation}`);
+        else show($('treasuryResult'), 'err', esc(explain(res)));
+        await wait(900);
+        await refreshNow();
+        if (command !== 'poison') await fillSnapshot();
+      }
+
+      async function openReservations() {
+        const all = [];
+        for (const status of ['RESERVED', 'PARTIALLY_RELEASED']) {
+          let cursor = null;
+          do {
+            const params = new URLSearchParams({ status, limit: '200' });
+            if (cursor) params.set('cursor', cursor);
+            const res = await api('GET', `/v1/programs/${pid()}/reservations?${params}`);
+            if (res.status !== 200) return all;
+            all.push(...res.body.items);
+            cursor = res.body.nextCursor;
+          } while (cursor);
+        }
+        return all;
+      }
+
+      // Prefill the snapshot with the current state, so editing one line creates exactly one difference.
+      async function fillSnapshot() {
+        if (!state.program) return;
+        const open = await openReservations();
+        state.openByInvoice = Object.fromEntries(open.map((r) => [r.invoiceId, r]));
+        $('tSnapItems').value = open.map((r) => `${r.invoiceId}=${r.program.outstanding}`).join('\n');
+        $('openInvoices').innerHTML = open.map((r) => `<option value="${esc(r.invoiceId)}">`).join('');
+      }
+
+      // -------------------------------------------------------------- ledger
+      const LEDGER = {
+        RESERVE: 'Reserved',
+        RELEASE: 'Repaid',
+        CANCEL: 'Cancelled',
+        LIMIT_CHANGE: 'Limit changed',
+        STATUS_CHANGE: 'Status changed',
+        RECON_ADJUSTMENT: 'Reconciliation fix',
+      };
+
+      async function loadLedger(reset) {
+        if (!state.program) return;
+        if (reset) state.ledgerCursor = null;
+        const params = new URLSearchParams({ order: 'desc', limit: '30' });
+        if (state.ledgerCursor) params.set('cursor', state.ledgerCursor);
+        const res = await api('GET', `/v1/programs/${state.program.programId}/ledger?${params}`);
+        if (res.status !== 200) return;
+        const rows = res.body.items
+          .map((e) => {
+            const d = e.details || {};
+            const detail =
+              e.type === 'LIMIT_CHANGE'
+                ? `limit ${Number(e.limitDelta) >= 0 ? '+' : ''}${fmt(e.limitDelta)} → ${fmt(e.limitAfter)}`
+                : e.type === 'STATUS_CHANGE'
+                  ? `${d.from ?? ''} → ${d.to ?? ''}`
+                  : `${d.invoiceId ?? ''}${d.reason ? ` · ${d.reason.toLowerCase().replace(/_/g, ' ')}` : ''}`;
+            const delta = Number(e.reservedDelta);
+            const color = delta > 0 ? 'var(--warn)' : delta < 0 ? 'var(--ok)' : 'var(--muted)';
+            return `<tr>
+              <td class="muted">${new Date(e.createdAt).toLocaleTimeString()}</td>
+              <td>${esc(LEDGER[e.type] ?? e.type)}</td>
+              <td class="mono">${esc(detail)}</td>
+              <td class="num" style="color:${color}">${delta ? (delta > 0 ? '+' : '') + fmt(e.reservedDelta) : '—'}</td>
+              <td class="num">${fmt(e.reservedAfter)}</td>
+              <td class="muted">${esc(e.actor)}</td>
+            </tr>`;
+          })
+          .join('');
+        if (reset) $('ledgerBody').innerHTML = rows || '<tr><td colspan="6" class="muted">No entries.</td></tr>';
+        else $('ledgerBody').insertAdjacentHTML('beforeend', rows);
+        state.ledgerCursor = res.body.nextCursor;
+        $('moreLedger').hidden = !state.ledgerCursor;
+      }
+
+      // -------------------------------------------------------------- wiring
+      document.querySelectorAll('.tabs button').forEach((b) => {
+        b.onclick = () => {
+          document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('active', x === b));
+          document
+            .querySelectorAll('.tab')
+            .forEach((t) => t.classList.toggle('active', t.id === `tab-${b.dataset.tab}`));
+        };
+      });
+      $('openLog').onclick = () => $('drawer').classList.add('open');
+      $('showGets').onchange = () => $('log').classList.toggle('hide-get', !$('showGets').checked);
+      $('closeLog').onclick = () => $('drawer').classList.remove('open');
+      $('clearLog').onclick = () => {
+        $('log').innerHTML = '';
+        state.logCount = 0;
+        $('logCount').textContent = '0';
+      };
+
+      $('resCurrency').innerHTML = CURRENCIES.map((c) => `<option>${c}</option>`).join('');
+      $('resInvoice').value = `INV-${rnd()}`;
+      $('genKey').onclick = () => ($('resKey').value = crypto.randomUUID());
+      $('newInvoice').onclick = () => ($('resInvoice').value = `INV-${rnd()}`);
+      $('burst').onclick = () => burst(false);
+      $('burstSame').onclick = () => burst(true);
+      $('resFilter').onchange = () => loadReservations(true);
+      $('moreRes').onclick = () => loadReservations(false);
+      $('moreLedger').onclick = () => loadLedger(false);
+      $('client').onchange = switchClient;
+      $('program').onchange = selectProgram;
+
+      $('tProgram').onclick = () =>
+        sendTreasury(
+          'program',
+          [pid(), pccy(), $('tLimit').value.trim(), $('tStatus').value],
+          'The new limit/status appears on the capacity card in a moment.',
+        );
+      $('tRelease').onclick = () => {
+        const inv = $('tRelInvoice').value.trim();
+        const amount = $('tRelAmount').value.trim();
+        const args = [pid(), inv];
+        // Repayments are in invoice currency; take it from the reservation when we know it.
+        if (amount) args.push(amount, state.openByInvoice?.[inv]?.invoice.currency ?? pccy());
+        sendTreasury(
+          'release',
+          args,
+          'If the invoice is open its outstanding amount drops; an unknown invoice goes to the dead-letter queue.',
+        );
+      };
+      $('tSnapshot').onclick = () => {
+        const items = $('tSnapItems')
+          .value.split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean);
+        sendTreasury(
+          'snapshot',
+          [pid(), pccy(), $('tLimit').value.trim(), $('tStatus').value, ...items],
+          'Differences (if any) appear in the Ledger tab as “Reconciliation fix”.',
+        );
+      };
+      $('tFill').onclick = fillSnapshot;
+      $('tDuplicate').onclick = () =>
+        sendTreasury(
+          'duplicate',
+          [pid(), pccy(), $('tLimit').value.trim()],
+          'Two identical messages were sent; the version on the capacity card moves by one, not two.',
+        );
+      $('tStale').onclick = () =>
+        sendTreasury('stale', [pid(), pccy()], 'An old event (limit = 1) was sent; the limit must not change.');
+      $('tPoison').onclick = () =>
+        sendTreasury('poison', [], 'The service moved it to treasury.dlq and kept processing other messages.');
+
+      loadClients().then(switchClient);
+    </script>
+  </body>
+</html>
