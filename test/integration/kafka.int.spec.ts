@@ -1,5 +1,6 @@
 import { KafkaContainer, StartedKafkaContainer } from '@testcontainers/kafka';
 import { Consumer, Kafka, logLevel, Partitioners, Producer } from 'kafkajs';
+import { Pool } from 'pg';
 import { programUpserted, reserve, resetDb, setup, TestContext } from './helpers';
 
 jest.setTimeout(180_000);
@@ -47,13 +48,18 @@ describe('Kafka end-to-end', () => {
       },
     });
 
+    // Reset before the app boots: the outbox relay starts with it and would otherwise publish rows
+    // left behind by earlier spec files (they share the database but run without Kafka).
+    const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
+    await resetDb(pool);
+    await pool.end();
+
     ctx = await setup({
       KAFKA_ENABLED: 'true',
       KAFKA_BROKERS: brokers.join(','),
       KAFKA_GROUP_ID: `svc-${Date.now()}`,
       ...TOPICS,
     });
-    await resetDb(ctx.pool);
   });
 
   afterAll(async () => {
@@ -95,11 +101,12 @@ describe('Kafka end-to-end', () => {
     });
 
     await reserve(ctx, 'K-1', 'INV-1', '250.00', 'USD').expect(201);
-    const events = await eventually(() => {
-      const list = (tapped[TOPICS.KAFKA_TOPIC_CAPACITY_EVENTS] ?? []).map((m) => JSON.parse(m.value));
-      return list.some((e) => e.cause === 'RESERVE') ? list : undefined;
-    });
-    expect(events.find((e) => e.cause === 'RESERVE')).toMatchObject({
+    const reserved = await eventually(() =>
+      (tapped[TOPICS.KAFKA_TOPIC_CAPACITY_EVENTS] ?? [])
+        .map((m) => JSON.parse(m.value))
+        .find((e) => e.cause === 'RESERVE' && e.programId === 'K-1'),
+    );
+    expect(reserved).toMatchObject({
       type: 'CAPACITY_CHANGED',
       programId: 'K-1',
       reserved: '250.00',
